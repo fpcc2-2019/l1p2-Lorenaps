@@ -7,6 +7,18 @@ O objeto principal da análise são as buscas e a navegação depois da busca. C
 
 Aqui, exploramos esses dados. 
 
+Taxa de cliques - 
+Taxa de 0 resultados - 
+session_start_timestamp e session_start_date não medem o timestamp e data que a sessão iniciou - medem o timestamp e data *em que a busca* foi feita.
+
+Uma sessão tem apenas um grupo
+
+uma sessão pode ter duas ações diferentes
+
+existem so 3 tipos de ações - checkin	223824			
+searchResultPag			
+visitPage
+
 ```{r setup}
 library(tidyverse)
 library(here)
@@ -22,5 +34,9 @@ buscas = read_csv(here::here("data/search_data.csv"))
 buscas %>% 
     ggplot(aes(x = results)) + 
     geom_histogram(binwidth = 5) 
+```
+```{r}
+
+bus
 ```
 

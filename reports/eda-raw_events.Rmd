@@ -16,29 +16,101 @@ theme_set(theme_bw())
 ## Lendo os eventos
 
 ```{r ETL}
-events = read_csv("https://github.com/wikimedia-research/Discovery-Hiring-Analyst-2016/raw/master/events_log.csv.gz")
+# events = read_csv("https://github.com/wikimedia-research/Discovery-Hiring-Analyst-2016/raw/master/events_log.csv.gz")
 
-events = events %>% slice(1:5e4) # Útil para testar código em dados pequenos. Comente na hora de processá-los para valer.
+events = read.csv("../../events_log.csv")
 
-events = events %>% 
-    group_by(session_id) %>% 
+events = events %>% mutate(date = ymd_hms(timestamp))
+
+events_slice = events %>% slice(1:5e4) # Útil para testar código em dados pequenos. Comente na hora de processá-los para valer.
+
+events_s = events_slice %>% 
+    group_by(session_id) %>%
     arrange(timestamp) %>% 
-    mutate(search_index = cumsum(action == "searchResultPage"), # contador de buscas na sessão.
-           date = ymd_hms(timestamp))  %>% 
+    mutate(search_index = cumsum(action == "searchResultPage"), # contador de buscas na sessão.        
+           date = ymd_hms(timestamp))  %>%
     ungroup()
+
+options(scipen=999)
+
+search_index = events_s %>% filter(search_index > 0)
 ```
+#### Existem 12.219 sessões com actions diferentes
+
+```{r}
+### Existem 12.219 sessões com actions diferentes
+events %>% group_by(session_id, action) %>% 
+            count() %>% 
+            filter(n > 1) %>%
+            group_by(session_id) %>% 
+            count() %>%
+            filter(nn > 1) %>%
+            arrange(desc(nn))
+```
+
+#### Existem 3 tipos de actions
+
+```{r}
+events %>% group_by(action) %>% count()
+
+```
+
+#### Sobre as páginas
+
+```{r}
+
+events %>% count(page_id) 
+```
+
+Existem 176371 páginas nos dados de um total de 400165 observações
+
+```{r}
+
+events %>% count(page_id) %>% filter(n == 1) 
+```
+
+144676 páginas aparecem apenas uma vez nos dados
+
+```{r}
+t = events %>% count(page_id) %>% filter(n > 1) %>% count(n) %>% arrange(n)
+
+```
+
+```{r}
+
+events %>% count(page_id) %>% filter(n > 1) %>% ggplot(aes(x=n)) + geom_histogram()
+
+```
+Das páginas que aparecem mais de uma vez a maioria aparece 16 vezes. Quais os sessions ids? e data? e actions?
+
+o que é checkin, n_results e position results?
 
 ## No tempo
 
-
 ```{r}
-events %>% 
+events_s %>% 
     mutate(date = round_date(date, unit = "day")) %>% 
     count(date, group) %>% 
     ggplot(aes(x = date, y = n, fill = group)) + 
     geom_area()
 ```
 
+#### Qual intervalo de data temos nos dados?
+```{r}
+
+events %>% 
+    mutate(day = round_date(date, unit = "day")) %>% 
+    count(day)
+    
+```
+
 ## Por tipo
 
 ## Etc.
+
+# 1 - What is our daily overall clickthrough rate? How does it vary between the groups?
+# 2 - Which results do people tend to try first? How does it change day-to-day?
+# 3 - What is our daily overall zero results rate? How does it vary between the groups?
+# 4 - Let session length be approximately the time between the first event and the last event in a session. 
+# 5 - Choose a variable from the dataset and describe its relationship to session length. Visualize the relationship.
+Summarize your findings in an executive summary.
