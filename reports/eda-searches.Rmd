@@ -35,8 +35,47 @@ buscas %>%
     ggplot(aes(x = results)) + 
     geom_histogram(binwidth = 5) 
 ```
+
+
+# 1 - What is our daily overall clickthrough rate? How does it vary between the groups?
+# 2 - Which results do people tend to try first? How does it change day-to-day?
+# 3 - What is our daily overall zero results rate? How does it vary between the groups?
+# 4 - Let session length be approximately the time between the first event and the last event in a session. 
+# 5 - Choose a variable from the dataset and describe its relationship to session length. Visualize the relationship.
+Summarize your findings in an executive summary.
+
+taxa de cliques: a proporção de sessões de pesquisa em que o usuário clicou em um dos resultados exibidos
+taxa de resultados zero: a proporção de pesquisas que resultaram em 0 resultados
+
+```{r}
+buscas %>% filter(session_id == "000216cf18ae1ab1")
+
+# o que significa as sessões aqui que tem num_click == 0 ?
+
+buscas %>% group_by(session_id) %>% suma %>% filter(num_clicks > 0) %>% summarise(n = n())
+
+buscas %>% filter(num_clicks == 0) %>% summarise(n = n())
+
+buscas %>% filter(num_clicks != 0, is.na(first_click))
+
+```
+
+
 ```{r}
 
-bus
+buscas = buscas %>% 
+    mutate(day = round_date(session_start_date, unit = "day")) 
+
+buscas %>% 
+    group_by(day, group) %>% 
+    summarise(clicks_day = sum(num_clicks)) %>% 
+    mutate(clicks_total = cumsum(clicks_day))
+
+buscas %>% 
+    group_by(day, group) %>% 
+    summarise(total = sum(num_clicks)) %>%
+    ggplot(aes(x = day, y = total, fill = group)) + 
+    geom_area() 
+
 ```
 

@@ -18,9 +18,9 @@ theme_set(theme_bw())
 ```{r ETL}
 # events = read_csv("https://github.com/wikimedia-research/Discovery-Hiring-Analyst-2016/raw/master/events_log.csv.gz")
 
-events = read.csv("../../events_log.csv")
+# events = read.csv("../../events_log.csv")
 
-events = events %>% mutate(date = ymd_hms(timestamp))
+# events = events %>% mutate(date = ymd_hms(timestamp))
 
 events_slice = events %>% slice(1:5e4) # Útil para testar código em dados pequenos. Comente na hora de processá-los para valer.
 
@@ -44,7 +44,7 @@ events %>% group_by(session_id, action) %>%
             filter(n > 1) %>%
             group_by(session_id) %>% 
             count() %>%
-            filter(nn > 1) %>%
+            filter(n > 1) %>%
             arrange(desc(nn))
 ```
 
@@ -66,7 +66,7 @@ Existem 176371 páginas nos dados de um total de 400165 observações
 
 ```{r}
 
-events %>% count(page_id) %>% filter(n == 1) 
+events %>% count(page_id, alias="hugo") %>% filter(n == 1) 
 ```
 
 144676 páginas aparecem apenas uma vez nos dados
@@ -107,10 +107,3 @@ events %>%
 ## Por tipo
 
 ## Etc.
-
-# 1 - What is our daily overall clickthrough rate? How does it vary between the groups?
-# 2 - Which results do people tend to try first? How does it change day-to-day?
-# 3 - What is our daily overall zero results rate? How does it vary between the groups?
-# 4 - Let session length be approximately the time between the first event and the last event in a session. 
-# 5 - Choose a variable from the dataset and describe its relationship to session length. Visualize the relationship.
-Summarize your findings in an executive summary.
