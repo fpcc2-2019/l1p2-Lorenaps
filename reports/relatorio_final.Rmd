@@ -68,7 +68,15 @@ merge_busca %>%
     summarise(sum_parcial = sum(parcial), sum_total = sum(total)) %>% 
     mutate(taxa = sum_parcial / sum_total) %>%
     ggplot(aes(x = day, y = taxa)) + 
-    geom_line() 
+    geom_jitter(aes(size = taxa, color = taxa))
+
+merge_busca %>% 
+    group_by(day) %>%
+    summarise(sum_parcial = sum(parcial), sum_total = sum(total)) %>% 
+    mutate(taxa = sum_parcial / sum_total) %>%
+    ggplot(mapping = aes(x = day, y = taxa)) + 
+    geom_line() +
+    geom_point()
 
 ```
 
@@ -77,11 +85,17 @@ merge_busca %>%
 ```{r}
 merge_busca %>% 
     mutate(taxa = parcial / total) %>%
-    ggplot(aes(x = day, y = taxa, color=group)) + 
-    geom_line() 
+    ggplot(mapping = aes(x = day, y = taxa, color=group)) + 
+    geom_line() +
+    geom_point()
+
 ```
 
 ## 2 - Quais resultados as pessoas tendem a tentar primeiro? Como isso muda no dia-a-dia?
+
+```{r}
+
+```
 
 
 ## 3 - Qual é a nossa taxa de resultados zero no geral? Como isso varia entre os grupos?
@@ -106,8 +120,9 @@ merge_results %>%
     group_by(day) %>%
     summarise(sum_parcial = sum(parcial), sum_total = sum(total)) %>% 
     mutate(taxa = sum_parcial / sum_total) %>%
-    ggplot(aes(x = day, y = taxa)) + 
-    geom_line() 
+    ggplot(mapping = aes(x = day, y = taxa)) + 
+    geom_line() +
+    geom_point()
 
 ```
 
@@ -115,13 +130,28 @@ merge_results %>%
 ```{r}
 merge_results %>% 
     mutate(taxa = parcial / total) %>%
-    ggplot(aes(x = day, y = taxa, color=group)) + 
-    geom_line()
+    ggplot(mapping = aes(x = day, y = taxa, color=group)) + 
+    geom_line() + 
+    geom_point()
 
 ```
 
 ## 4 - A duração da sessão é aproximadamente o tempo entre o primeiro e o último evento de uma sessão. Escolha uma variável do conjunto de dados e descreva sua relação com o tamanho da sessão. Visualize o relacionamento.
 
-taxa de cliques: a proporção de sessões de pesquisa em que o usuário clicou em um dos resultados exibidos
-taxa de resultados zero: a proporção de pesquisas que resultaram em 0 resultados
+```{r}
 
+duracao = buscas %>% 
+    group_by(session_id, session_length) %>%
+    summarise(sum_results = sum(results)) %>%
+    mutate(tempo_em_minutos = session_length / 60)
+
+duracao %>% 
+    ggplot(mapping = aes(x = sum_results, y = tempo_em_minutos)) + 
+    geom_jitter(aes(size = sum_results, alpha=0.4)) + 
+    ggtitle("Relação entre resultados de busca e duração da sessão") + 
+    labs(x="Resultados por sessão", y="Duração por sessão (em minutos)", size = "Resultados") + 
+    guides(alpha = FALSE, color = FALSE) 
+
+```
+
+Nesse gráfico é possível perceber que não existe uma relação direta entre a quantidade de resultados de busca obtidos em uma sessão e o tempo que gasto naquela sessão. É possível considerar essa hipotese se considerarmos que o usuário pode ficar indeciso diante de muitos resultados e isso o leve a passar mais tempo pesquisando ou olhando a lista de resultados. Mas isso não é determinante porque mesmo com uma lista grande de resultados é possível que os primeiros já atendam a necessidade do usuário, bem como um lista de resultados menores, o que nesse caso pode ter sido influenciado por uma string de busca mais específica e que trouxe resultados de forma mais eficaz.
