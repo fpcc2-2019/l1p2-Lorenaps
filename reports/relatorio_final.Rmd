@@ -1,0 +1,115 @@
+---
+title: "Sessões, buscas e navegação na wikimedia"
+author: "Lorena Pereira"
+date: "8 de maio de 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+A partir da base de dados https://github.com/wikimedia-research/Discovery-Hiring-Analyst-2016
+e do tratamento feito em https://github.com/fpcc2-2019/l1p2-Lorenaps
+vamos responder as seguintes perguntas:
+
+```{r echo=FALSE}
+library(tidyverse)
+library(here)
+library(lubridate)
+library(ggplot2)
+theme_set(theme_bw())
+
+buscas = read_csv(here::here("data/search_data.csv")) %>% 
+    mutate(day = round_date(session_start_date, unit = "day")) 
+
+```
+## 2 - Quais resultados as pessoas tendem a tentar primeiro? Como isso muda no dia-a-dia?
+## 3 - Qual é a nossa taxa de resultados zero no geral? Como isso varia entre os grupos?
+## 4 - A duração da sessão é aproximadamente o tempo entre o primeiro e o último evento de uma sessão.
+## 5 - Escolha uma variável do conjunto de dados e descreva sua relação com o tamanho da sessão. Visualize o relacionamento.
+Summarize your findings in an executive summary.
+
+taxa de cliques: a proporção de sessões de pesquisa em que o usuário clicou em um dos resultados exibidos
+taxa de resultados zero: a proporção de pesquisas que resultaram em 0 resultados
+
+-----
+
+## 1 - Qual é a nossa taxa de cliques geral diária? Como isso varia entre os grupos?
+
+*taxa de cliques: a proporção de sessões de pesquisa em que o usuário clicou em um dos resultados exibidos*
+
+Sessões em que houveram clique por dia / total de sessoes por dia
+
+Para calcular o total de sessões existentes idependente da busca é preciso agrupar por dias e depois somar, pois existem sessões que se repetem em alguns dias. Como observado abaixo:
+
+```{r}
+buscas %>% group_by(session_id, day) %>% count() %>% filter(session_id == "8cf57f4f99f96220")
+```
+
+#### Taxa diária
+```{r}
+
+total_diaria = buscas %>% 
+    group_by(session_id, day) %>% 
+    count() %>% 
+    group_by(session_id, day) %>% 
+    count() %>%
+    group_by(day) %>%
+    count()
+
+com_cliques_diaria = buscas %>% 
+    filter(num_clicks != 0) %>%
+    group_by(session_id, day) %>% 
+    count() %>% 
+    group_by(session_id, day) %>% 
+    count() %>%
+    group_by(day) %>%
+    count()
+
+total_diaria %>%
+ggplot(aes(x = day, y = n)) + 
+    geom_line() +
+    geom_line(aes(y = com_cliques_diaria$n))
+
+```
+
+#### Taxa diária por grupo
+```{r}
+
+total = buscas %>% 
+    group_by(session_id, day, group) %>% 
+    count() %>% 
+    group_by(session_id, day, group) %>% 
+    count() %>%
+    group_by(day, group) %>%
+    count() %>%
+    rename(total_sessions = n)
+
+cclicks = buscas %>% 
+    filter(num_clicks != 0) %>%
+    group_by(session_id, day, group) %>% 
+    count() %>% 
+    group_by(session_id, day, group) %>% 
+    count() %>%
+    group_by(day, group) %>%
+    count() %>%
+    rename(click_sessions = n)
+
+taxa_click = merge(total, cclicks, by = c("day", "group")) %>%
+                mutate(taxa = click_sessions / total_sessions)
+
+taxa_click %>%
+ggplot(aes(x = day, y = taxa, color=group)) + 
+    geom_line() 
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
