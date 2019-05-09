@@ -29,12 +29,12 @@ buscas = read_csv(here::here("data/search_data.csv")) %>%
 
 *taxa de cliques: a proporção de sessões de pesquisa em que o usuário clicou em um dos resultados exibidos*
 
-Sessões em que houveram clique por dia / total de sessoes por dia
+Para calcular a taxa consideramos = Sessões em que houveram clique (por dia) / Total de sessoes (por dia)
 
-Para calcular o total de sessões existentes idependente da busca é preciso agrupar por dias e depois somar, pois existem sessões que se repetem em alguns dias. Como observado abaixo:
+Para calcular o total de sessões existentes independente da o ocorrência de cliques foi preciso agrupar por dias e depois somar, pois existem sessões que se repetem em alguns dias. Como observado abaixo:
 
 ```{r}
-buscas %>% group_by(session_id, day) %>% count() %>% filter(session_id == "8cf57f4f99f96220")
+buscas %>% filter(session_id == "8cf57f4f99f96220") %>% group_by(session_id, day) %>% count()
 ```
 
 #### Taxa diária
@@ -94,7 +94,41 @@ merge_busca %>%
 ## 2 - Quais resultados as pessoas tendem a tentar primeiro? Como isso muda no dia-a-dia?
 
 ```{r}
+buscas %>%
+    filter(!is.na(first_click)) %>%
+    group_by(first_click) %>%
+    count() %>%
+    arrange(desc(n))
 
+
+```
+É visível que as pessoas preferem o primeiro resultado. Mas o que acontece quando olhamos esse dados ao longo do dia?
+
+```{r}
+
+buscas = buscas %>%
+    mutate(turno = case_when(hour(session_start_date) >= 0 & hour(session_start_date) < 12 ~ "Manhã", 
+                            hour(session_start_date) >= 12 & hour(session_start_date) < 18 ~ "Tarde", 
+                            hour(session_start_date) >= 18 & hour(session_start_date) <= 23 ~ "Noite"))
+
+buscas %>%   
+    filter(!is.na(first_click)) %>%
+    group_by(first_click, turno) %>%
+    count() %>%
+    arrange(desc(n))
+    
+```
+
+Observando ao longo do dia elas continuam consumindo mais o primeiro resultado.
+É possível observar uma diferança muito grando do primeiro resultado para o segundo e assim sucessivamente. 
+Vamos explorar um pouco mais o que acontecem com aquels que não são o primeiro resultado.
+
+```{r}
+buscas %>% 
+    ggplot(mapping = aes(x = first_click, y = search_index)) + 
+    geom_jitter(aes(alpha=0.4)) + 
+    ggtitle("Relação entre ordem dos resultados e preferencia dos usuários") + 
+    guides(alpha = FALSE, color = FALSE) 
 ```
 
 
