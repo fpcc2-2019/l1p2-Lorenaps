@@ -1,5 +1,5 @@
 ---
-title: "Sessões, buscas e navegação na wikimedia"
+title: "Sessões, buscas e navegação na Wikimedia"
 author: "Lorena Pereira"
 date: "8 de maio de 2019"
 output: html_document
@@ -9,9 +9,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-A partir da base de dados https://github.com/wikimedia-research/Discovery-Hiring-Analyst-2016
-e do tratamento feito em https://github.com/fpcc2-2019/l1p2-Lorenaps
-vamos responder as seguintes perguntas:
+A partir do exercício e da base de dados disponíveis pela Wikimedia nesse link: https://github.com/wikimedia-research/Discovery-Hiring-Analyst-2016 foram feitas análises a fim de responder algumas perguntas.
+
+A base de dados retrata o contexto sobre resultados de buscas e a navegação na Wikimedia. 
+Detalhes sobre a tarefa e os atibutos da base de dados podem ser encontrados aqui: https://github.com/fpcc2-2019/l1p2-Lorenaps.
 
 ```{r echo=FALSE}
 library(tidyverse)
@@ -25,20 +26,13 @@ buscas = read_csv(here::here("data/search_data.csv")) %>%
 
 ```
 
-## 1 - Qual é a nossa taxa de cliques geral diária? Como isso varia entre os grupos?
+## 1º - Qual é a nossa taxa de cliques geral diária? Como isso varia entre os grupos?
 
 *taxa de cliques: a proporção de sessões de pesquisa em que o usuário clicou em um dos resultados exibidos*
 
 Para calcular a taxa consideramos = Sessões em que houveram clique (por dia) / Total de sessoes (por dia)
 
-Para calcular o total de sessões existentes independente da o ocorrência de cliques foi preciso agrupar por dias e depois somar, pois existem sessões que se repetem em alguns dias. Como observado abaixo:
-
-```{r}
-buscas %>% filter(session_id == "8cf57f4f99f96220") %>% group_by(session_id, day) %>% count()
-```
-
 #### Taxa diária
-
 
 ```{r}
 
@@ -67,42 +61,62 @@ merge_busca %>%
     group_by(day) %>%
     summarise(sum_parcial = sum(parcial), sum_total = sum(total)) %>% 
     mutate(taxa = sum_parcial / sum_total) %>%
-    ggplot(aes(x = day, y = taxa)) + 
-    geom_jitter(aes(size = taxa, color = taxa))
+    ggplot(mapping = aes(x = day, y = taxa)) + 
+    geom_line() +
+    geom_point() + 
+    ggtitle("Taxa Diária de Clicks") + 
+    labs(x="Dia", y="Taxa de Cliques")
+
+```
+
+
+Os dados existentes na base estão no intervalo de tempo de 01 a 09 de Março de 2016.
+A maior taxa de cliques ocorreu no dia 04 de Março e a menor no dia 02. 
+
+```{r}
 
 merge_busca %>% 
     group_by(day) %>%
     summarise(sum_parcial = sum(parcial), sum_total = sum(total)) %>% 
-    mutate(taxa = sum_parcial / sum_total) %>%
-    ggplot(mapping = aes(x = day, y = taxa)) + 
-    geom_line() +
-    geom_point()
-
+    mutate(Taxa = sum_parcial / sum_total) %>%
+    arrange(Taxa) %>%
+    rename(Dia = day, "Sessões com click" = sum_parcial, "Total de Sessões" = sum_total)
 ```
 
-#### Taxa diária por grupo
+
+Embora o gráfico mostre uma reta fortemente inclinada a taxa encontrada não varia muito, vai de 0.378 a 0.396.
+
+#### Considerando a taxa diária por grupo
 
 ```{r}
 merge_busca %>% 
     mutate(taxa = parcial / total) %>%
     ggplot(mapping = aes(x = day, y = taxa, color=group)) + 
     geom_line() +
-    geom_point()
+    geom_point() + 
+    ggtitle("Taxa Diária de Clicks", subtitle = "Por grupo") + 
+    labs(x="Dia", y="Taxa de Cliques", color = "Grupo")
 
 ```
 
+
+Na observação anterior vimos que a taxa geral não variava muito. Mas quando detalhamos o dado agrupando pelos grupos de pesquisa presentes na base podemos perceber o quanto o grupo A possui maiores taxas de clicks em comparação com o grupo B.
+
 ## 2 - Quais resultados as pessoas tendem a tentar primeiro? Como isso muda no dia-a-dia?
+
+Na base de dados existe um atributo que representa qual era a posição do link da página visitada no mecanismo de busca de páginas. Agrupando os dados por esse campo temos:
 
 ```{r}
 buscas %>%
     filter(!is.na(first_click)) %>%
     group_by(first_click) %>%
     count() %>%
-    arrange(desc(n))
-
+    arrange(desc(n)) %>%
+    rename("Posição na página" = first_click, "Total de registros" = n)
 
 ```
-É visível que as pessoas preferem o primeiro resultado. Mas o que acontece quando olhamos esse dados ao longo do dia?
+É claramente visível que as pessoas interagem mais com o primeiro resultado. 
+Como será que essa preferência se comporta quando olhamos esse dados ao longo do dia?
 
 ```{r}
 
@@ -110,65 +124,70 @@ buscas = buscas %>%
     mutate(turno = case_when(hour(session_start_date) >= 0 & hour(session_start_date) < 12 ~ "Manhã", 
                             hour(session_start_date) >= 12 & hour(session_start_date) < 18 ~ "Tarde", 
                             hour(session_start_date) >= 18 & hour(session_start_date) <= 23 ~ "Noite"))
-
 buscas %>%   
     filter(!is.na(first_click)) %>%
     group_by(first_click, turno) %>%
     count() %>%
-    arrange(desc(n))
-    
+    arrange(desc(n)) %>%
+    rename("Posição na página" = first_click, "Turno" = turno, "Buscas" = n)
+
 ```
 
 Observando ao longo do dia elas continuam consumindo mais o primeiro resultado.
-É possível observar uma diferança muito grando do primeiro resultado para o segundo e assim sucessivamente. 
-Vamos explorar um pouco mais o que acontecem com aquels que não são o primeiro resultado.
 
 ```{r}
-buscas %>% 
-    ggplot(mapping = aes(x = first_click, y = search_index)) + 
-    geom_jitter(aes(alpha=0.4)) + 
-    ggtitle("Relação entre ordem dos resultados e preferencia dos usuários") + 
-    guides(alpha = FALSE, color = FALSE) 
+buscas %>%   
+    filter(!is.na(first_click)) %>%
+    group_by(first_click, turno) %>%
+    count() %>%
+    ggplot(mapping = aes(x = n, y = first_click)) + 
+    geom_line() +
+    facet_wrap(.~ turno) + 
+    scale_y_continuous(trans = "log10") + 
+    ggtitle("Interação dos usuários considerando a posição nos resultados de busca", subtitle = "Por turno") + 
+    labs(x="Buscas", y="Posição nos resultados")
+
 ```
 
+Embora a preferência seja claramente o primeiro resultado de busca, com o gráfico acima podemos perceber que na manhã pe o turno onde ocorre uma maior quantidade de pesquisas.
 
 ## 3 - Qual é a nossa taxa de resultados zero no geral? Como isso varia entre os grupos?
-taxa de resultados zero: a proporção de pesquisas que resultaram em 0 resultados
+
+*taxa de resultados zero: a proporção de pesquisas que resultaram em 0 resultados*
 
 ```{r}
 
 total_results = buscas %>% 
-    group_by(day, group) %>% 
+    group_by(group) %>% 
     count() %>% 
     rename(total = n)
 
 zero_results = buscas %>% 
     filter(results == 0) %>%
-    group_by(day, group) %>% 
+    group_by(group) %>% 
     count() %>% 
     rename(parcial = n)
 
-merge_results = merge(zero_results, total_results, by = c("day", "group")) 
+merge_results = merge(zero_results, total_results, by = c("group")) 
 
 merge_results %>% 
-    group_by(day) %>%
     summarise(sum_parcial = sum(parcial), sum_total = sum(total)) %>% 
-    mutate(taxa = sum_parcial / sum_total) %>%
-    ggplot(mapping = aes(x = day, y = taxa)) + 
-    geom_line() +
-    geom_point()
+    mutate(Taxa = sum_parcial / sum_total) %>%
+    rename("Parcial" = sum_parcial, "Total" = sum_total)
+
 
 ```
 
+Temos uma taxa de 0.18 de 0 resultados.
 
 ```{r}
 merge_results %>% 
-    mutate(taxa = parcial / total) %>%
-    ggplot(mapping = aes(x = day, y = taxa, color=group)) + 
-    geom_line() + 
-    geom_point()
+    mutate(Taxa = parcial / total) %>%
+    rename("Parcial" = parcial, "Total" = total, "Grupo" = group)
 
 ```
+
+Olhando por grupo também não parece ter muita diferença nas taxas de 0 resultados.
 
 ## 4 - A duração da sessão é aproximadamente o tempo entre o primeiro e o último evento de uma sessão. Escolha uma variável do conjunto de dados e descreva sua relação com o tamanho da sessão. Visualize o relacionamento.
 
@@ -188,4 +207,4 @@ duracao %>%
 
 ```
 
-Nesse gráfico é possível perceber que não existe uma relação direta entre a quantidade de resultados de busca obtidos em uma sessão e o tempo que gasto naquela sessão. É possível considerar essa hipotese se considerarmos que o usuário pode ficar indeciso diante de muitos resultados e isso o leve a passar mais tempo pesquisando ou olhando a lista de resultados. Mas isso não é determinante porque mesmo com uma lista grande de resultados é possível que os primeiros já atendam a necessidade do usuário, bem como um lista de resultados menores, o que nesse caso pode ter sido influenciado por uma string de busca mais específica e que trouxe resultados de forma mais eficaz.
+Nesse gráfico é possível perceber que não existe uma relação direta entre a quantidade de resultados de busca obtidos em uma sessão e o tempo que gasto naquela sessão. É possível considerar essa hipotese se considerarmos que o usuário pode ficar indeciso diante de muitos resultados e isso o leve a passar mais tempo pesquisando ou olhando a lista de resultados. Mas a quantidade de resultados não é determinante porque mesmo com uma lista grande de resultados é possível que os primeiros já atendam a necessidade do usuário, bem como um lista com resultados menores, o que nesse caso pode ter sido influenciado por uma string de busca mais específica e que trouxe resultados de forma mais eficaz.
