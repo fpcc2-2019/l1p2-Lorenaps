@@ -1,0 +1,154 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+A partir do exercício e da base de dados disponíveis pela Wikimedia nesse link: https://github.com/wikimedia-research/Discovery-Hiring-Analyst-2016 foram feitas análises a fim de responder algumas perguntas.
+
+A base de dados retrata o contexto sobre resultados de buscas e a navegação na Wikimedia. 
+Detalhes sobre a tarefa e os atibutos da base de dados podem ser encontrados aqui: https://github.com/fpcc2-2019/l1p2-Lorenaps.
+
+```{r echo=FALSE}
+library(tidyverse)
+library(here)
+library(lubridate)
+library(ggplot2)
+theme_set(theme_bw())
+
+buscas = read_csv(here::here("data/search_data.csv")) %>% 
+    mutate(day = round_date(session_start_date, unit = "day")) 
+
+```
+
+O PROBLEMA 
+Considerando que os dados da wikimedia que usamos no Laboratório 2, faça uma inferência sobre como é, na população de todas as sessões do site: 
+1. A diferença entre o clickthrough rate dos grupos A e B; e 
+2. A diferença na proporção buscas com zero resultados nos grupos A e B
+
+O QUE PRECISA SER FEITO
+Você deve produzir, para os pontos 1 e 2 acima: 
+a. Um parágrafo de resposta contendo os números necessários e explicando a sua resposta usando testes de hipótese via pemutação. O parágrafo deve ser estilo o que você colocaria em um artigo - claro, formal e contendo as estatísticas e termos necessários (p-valor, se foram usadas permutações, qual era a estatística do teste, etc.). 
+b. Um parágrafo de resposta contendo os números necessários e explicando a sua resposta usando ICs. O parágrafo deve ser estilo o que você colocaria em um artigo - claro, formal e contendo as estatísticas e termos necessários (nível de confiança, limites do IC, etc.). 
+c. Um parágrafo que comenta se/como os pontos a e b acima concordam, e que compara os dois parágrafos em termos de informação e utilidade para alguém tomando decisões na wikimedia.
+
+## 1 - A diferença entre o clickthrough rate dos grupos A e B
+
+```{r}
+
+total_busca = buscas %>% 
+    group_by(session_id, day, group) %>% 
+    count() %>% 
+    group_by(session_id, day, group) %>% 
+    count() %>%
+    group_by(day, group) %>%
+    count() %>%
+    rename(total = n)
+
+busca_com_clicks = buscas %>% 
+    filter(num_clicks > 0) %>%
+    group_by(session_id, day, group) %>% 
+    count() %>% 
+    group_by(session_id, day, group) %>% 
+    count() %>%
+    group_by(day, group) %>%
+    count() %>%
+    rename(parcial = n)
+
+merge_busca = merge(total_busca, busca_com_clicks, by = c("day", "group")) 
+
+merge_busca = merge_busca %>% 
+    mutate(taxa = parcial / total)
+
+```
+
+
+### Teste de hipótese
+```{r}
+library(resample)
+options(scipen=999)
+
+p = permutationTest2(merge_busca, 
+                     mean(taxa), 
+                     treatment = as.factor(group))
+p$stats$PValue
+```
+
+### Intervalo de confiança
+```{r}
+library(boot)
+library(broom)
+
+t = merge_busca %>%
+    group_by(day) %>%
+    mutate(dif = )
+
+theta_diferenca_semana = function(d, i){
+    sonos = d %>% 
+        slice(i) %>% 
+        group_by(turma) %>% 
+        summarise(sono = mean(sono_semana)) 
+    
+    cdd = sonos %>% filter(turma == "cdd") %>% pull(sono)
+    fpcc = sonos %>% filter(turma == "fpcc") %>% pull(sono)
+    
+    cdd - fpcc
+}
+
+
+theta_diff = function(d, i){
+    diff = d %>% 
+        slice(i) %>% 
+        group_by(group) %>% 
+        summarise(taxa_mean = mean(taxa)) 
+    
+    a = diff %>% filter(group == "a") %>% pull(taxa_mean)
+    b = diff %>% filter(turma == "b") %>% pull(taxa_mean)
+    
+    a - b
+}
+
+
+booted <- boot(data = lastfm, 
+               statistic = function_prop, 
+               R = 4000)
+
+ci = tidy(booted, 
+          conf.level = .95,
+          conf.method = "basic",
+          conf.int = TRUE)
+ci
+```
+
+## 2 - A diferença na proporção buscas com zero resultados nos grupos A e B
+```{r}
+
+total_results = buscas %>% 
+    group_by(group) %>% 
+    count() %>% 
+    rename(total = n)
+
+zero_results = buscas %>% 
+    filter(results == 0) %>%
+    group_by(group) %>% 
+    count() %>% 
+    rename(parcial = n)
+
+merge_results = merge(zero_results, total_results, by = c("group")) 
+
+merge_results = merge_results %>% 
+    mutate(Taxa = parcial / total) %>%
+    rename("Parcial" = parcial, "Total" = total, "Grupo" = group)
+
+
+```
+
+### Teste de hipótese
+```{r}
+library(resample)
+options(scipen=999)
+
+p = permutationTest2(merge_results, 
+                     mean(Taxa), 
+                     treatment = as.factor(Grupo))
+p$stats$PValue
+```
