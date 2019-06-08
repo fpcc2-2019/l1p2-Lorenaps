@@ -28,29 +28,19 @@ Considerando que os dados da wikimedia que usamos no Laboratório 2, faça uma i
 ```{r}
 
 total_busca = buscas %>% 
-    group_by(session_id, day, group) %>% 
-    count() %>% 
-    group_by(session_id, day, group) %>% 
-    count() %>%
-    group_by(day, group) %>%
+    group_by(session_id, group) %>%
     count() %>%
     rename(total = n)
 
 busca_com_clicks = buscas %>% 
     filter(num_clicks > 0) %>%
-    group_by(session_id, day, group) %>% 
-    count() %>% 
-    group_by(session_id, day, group) %>% 
-    count() %>%
-    group_by(day, group) %>%
+    group_by(session_id, group) %>%
     count() %>%
     rename(parcial = n)
 
-merge_busca = merge(total_busca, busca_com_clicks, by = c("day", "group")) 
+merge_busca = merge(total_busca, busca_com_clicks, by = c("session_id", "group")) 
 
-merge_busca = merge_busca %>% 
-    mutate(taxa = parcial / total)
-
+merge_busca2 = merge_busca %>% mutate(taxa = parcial / total)
 ```
 
 
@@ -59,41 +49,38 @@ merge_busca = merge_busca %>%
 library(resample)
 options(scipen=999)
 
-p = permutationTest2(merge_busca, 
+p = permutationTest2(merge_busca2, 
                      mean(taxa), 
                      treatment = as.factor(group))
 p$stats$PValue
 ```
 
+A partir do teste de hipótese foi possível observar que existe significância quando comparada a diferença no clickthrough dos grupos a e b, onde p = 0.0002.
+
+
 ### Intervalo de confiança
 
 Função para cálculo da diferença média
 ```{r}
-theta_diferenca_media = function(df, i){
+theta_diferenca_click = function(df, i){
     
-    busca_a = df %>%
-        filter(group == "a") %>%
-        rename(taxa_a = "taxa") %>%
-        select(day, taxa_a)
-
-    busca_b = df %>%
-        filter(group == "b") %>%
-        rename(taxa_b = "taxa") %>%
-        select(day, taxa_b)
+    diferenca_click = df %>% 
+        slice(i) %>%
+        group_by(group) %>%
+        summarise(sum_parcial_grupo = sum(parcial), sum_total_grupo = sum(total)) %>%
+        mutate(taxa = sum_parcial_grupo / sum_total_grupo) %>%
+        select(group, taxa) %>%
+        gather(Var, Val, - group) %>%
+        spread(group, Val) %>%
+        rename(taxa_a = "a", taxa_b = "b") %>%
+        summarise(diferenca_grupos = taxa_a - taxa_b) %>%
+        pull(diferenca_grupos)
     
-    busca_a_b = merge(busca_a, busca_b, by="day")
-
-    diferenca_media = busca_a_b %>% 
-        slice(i) %>% 
-        mutate(diferenca = taxa_a - taxa_b) %>%
-        summarise(mean_diff = mean(diferenca)) %>%
-        pull(mean_diff)
-    
-    return(diferenca_media)
+    return(diferenca_click)
 }
 
-diferenca_media = theta_diferenca_media(merge_busca, 1:NROW(merge_busca))
-diferenca_media
+diferenca_click = theta_diferenca_click(merge_busca, 1:NROW(merge_busca))
+diferenca_click
 ```
 
 Fazendo bootstrap
@@ -102,7 +89,7 @@ library(boot)
 library(broom)
 
 booted <- boot(data = merge_busca, 
-               statistic = theta_diferenca_media, 
+               statistic = theta_diferenca_click, 
                R = 4000)
 
 ci = tidy(booted, 
@@ -112,26 +99,25 @@ ci = tidy(booted,
 ci
 ```
 
+A partir do método utilizado, onde aplicamos 95% de confiança, chegamos a uma diferença média entre os grupos a e b de -0.41 e estimamos que para a população esse valor esteja entre -0.42 e -0.40.
+
 ## 2 - A diferença na proporção buscas com zero resultados nos grupos A e B
 ```{r}
-
 total_results = buscas %>% 
-    group_by(group) %>% 
+    group_by(session_id, group) %>%
     count() %>% 
     rename(total = n)
 
 zero_results = buscas %>% 
     filter(results == 0) %>%
-    group_by(group) %>% 
+    group_by(session_id, group) %>%
     count() %>% 
     rename(parcial = n)
 
-merge_results = merge(zero_results, total_results, by = c("group")) 
+merge_results = merge(zero_results, total_results, by = c("session_id", "group")) 
 
-merge_results = merge_results %>% 
-    mutate(taxa = parcial / total)
+merge_results2 = merge_results %>% mutate(taxa = parcial / total)
 
-merge_results
 ```
 
 ### Teste de Hipótese
@@ -139,10 +125,10 @@ merge_results
 library(resample)
 options(scipen=999)
 
-p = permutationTest2(merge_results, 
+p2 = permutationTest2(merge_results2, 
                      mean(taxa), 
                      treatment = as.factor(group))
-p$stats$PValue
+p2$stats$PValue
 ```
 
 
@@ -151,30 +137,32 @@ p$stats$PValue
 Função para calular a diferença entre os grupos
 ```{r}
 
-theta_diferenca_grupos = function(df, i){
+theta_diferenca_zero_results = function(df, i){
     
-    diferenca = df %>% 
+    diferenca_zero_results = df %>% 
         slice(i) %>%
-        select(taxa, group) %>%
+        group_by(group) %>%
+        summarise(sum_parcial_grupo = sum(parcial), sum_total_grupo = sum(total)) %>%
+        mutate(taxa = sum_parcial_grupo / sum_total_grupo) %>%
+        select(group, taxa) %>%
         gather(Var, Val, - group) %>%
-        group_by(group) %>% 
         spread(group, Val) %>%
         rename(taxa_a = "a", taxa_b = "b") %>%
         summarise(diferenca_grupos = taxa_a - taxa_b) %>%
         pull(diferenca_grupos)
-    
-    return(diferenca)
+
+    return(diferenca_zero_results)
 }
 
-diferenca = theta_diferenca_grupos(merge_results, 1:NROW(merge_results))
+diferenca = theta_diferenca_zero_results(merge_results, 1:NROW(merge_results))
 diferenca
 
 ```
 
 Fazendo bootstrap
 ```{r}
-booted_results <- boot(data = merge_busca, 
-               statistic = theta_diferenca_grupos, 
+booted_results <- boot(data = merge_results, 
+               statistic = theta_diferenca_zero_results, 
                R = 4000)
 
 ci_results = tidy(booted_results, 
